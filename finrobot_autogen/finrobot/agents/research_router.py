@@ -20,8 +20,10 @@ INTENTS = {
     DEFAULT_ROLE: r"基本面|财务|估值|财报|盈利|营收|负债|同业|现金流|分红|市盈率|市净率|"
                   r"\b(?:fundamentals?|valuation|earnings|financials|roe|roa|eps|pe|pb)\b",
     "Market_Analyst": r"市场(?:事件|情绪|消息|动态)|新闻|公告|舆情|热榜|异动|催化|"
+                      r"股价|走势|行情|盘面|波动(?:情况|幅度)|涨跌幅|进场|买入时机|卖出时机|"
+                      r"择时|建仓|加仓|减仓|清仓|"
                       r"(?:为什么|为何|因何|怎么).{0,6}(?:涨|跌)|(?:涨|跌)的原因|"
-                      r"\b(?:news|announcements?|sentiment|market events?)\b",
+                      r"\b(?:news|announcements?|sentiment|market events?|price action)\b",
     "A_Share_Factor_Researcher": r"动量|量价|价量|回测|波动率|成交活跃度|(?:日均|平均)成交量|因子|"
                                 r"\b(?:momentum|backtests?|volatility|factors?)\b",
     "Quant_Analyst": r"固定(?:数据|快照|实验)|量化实验|V2\s*实验|实验复现|复现实验|账本|"
