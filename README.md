@@ -375,3 +375,4 @@ python run_agent.py --mode single --role Market_Analyst  # 固定单角色（原
 - 修复 `get_sec_report` 年报选择：`fyear` 现在按**报告年份**匹配，不再按公告披露年份；检索窗口覆盖到报告年后两年。
 - 同一报告期存在多条公告时，优先正式年报，排除摘要、英文版、更正和取消公告；`latest` 取最新披露的正式年报。
 - 返回值新增年报标题，涉及文件：`finrobot_autogen/finrobot/data_source/akshare_utils.py`。
+- 修改优化router命中规则，添加更多关键词进行精准匹配
