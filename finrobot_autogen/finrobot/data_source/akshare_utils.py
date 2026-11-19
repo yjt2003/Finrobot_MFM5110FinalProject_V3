@@ -144,6 +144,31 @@ def _num_col(df: pd.DataFrame, name: str) -> pd.Series:
     return pd.Series(np.nan, index=df.index)
 
 
+def _select_annual_report(df: pd.DataFrame, report_year: str | None = None) -> pd.Series | None:
+    """按报告年份选择正式年报公告，而不是按披露年份。"""
+    if df is None or df.empty:
+        return None
+    title_col = next((name for name in ("公告标题", "title", "TITLE") if name in df.columns), None)
+    if title_col is None:
+        return None
+    candidates = df.copy()
+    candidates = candidates[candidates[title_col].astype(str).str.contains("年度报告", na=False)]
+    if report_year is not None:
+        candidates = candidates[
+            candidates[title_col].astype(str).str.contains(
+                rf"(?<!\d){re.escape(str(report_year))}年年度报告", regex=True, na=False
+            )
+        ]
+    if candidates.empty:
+        return None
+    # 同一报告期可能同时返回摘要、英文版、更正或取消公告，优先正式版。
+    penalty = candidates[title_col].astype(str).map(
+        lambda text: sum(token in text for token in ("摘要", "英文版", "取消", "更正"))
+    )
+    rows = candidates.assign(_penalty=penalty).sort_values("_penalty", kind="stable")
+    return rows.iloc[0].drop(labels=["_penalty"], errors="ignore")
+
+
 def _json_safe(value):
     if value is None:
         return None
@@ -744,14 +769,23 @@ class AkShareUtils:
             str, "年报年份，如 '2024' 或 'latest'。默认 'latest'"
         ] = "latest",
     ) -> str:
-        """返回年报公告链接和披露日期（对应 FMPUtils.get_sec_report）。"""
+        """返回年报公告标题、链接和披露日期（对应 FMPUtils.get_sec_report）。
+
+        ``fyear`` 指报告年份，例如 ``"2024"`` 表示 2024 年度报告。年报通常在
+        次年披露，因此检索窗口会覆盖到报告年后两年，并按标题中的报告年份匹配。
+        """
         code = _normalize_symbol(ticker_symbol)
         if fyear == "latest":
-            start_date = f"{max(datetime.now().year - 3, 1990)}-01-01"
+            report_year = None
+            start_date = f"{max(datetime.now().year - 5, 1990)}-01-01"
             end_date = datetime.now().strftime("%Y-%m-%d")
         else:
-            start_date = f"{fyear}-01-01"
-            end_date = f"{fyear}-12-31"
+            try:
+                report_year = str(int(fyear))
+            except (TypeError, ValueError):
+                raise ValueError("fyear must be 'latest' or a four-digit report year")
+            start_date = f"{report_year}-01-01"
+            end_date = f"{int(report_year) + 2}-12-31"
 
         df = AkShareUtils.get_announcements(
             code, start_date=start_date, end_date=end_date, category="年报"
@@ -759,17 +793,38 @@ class AkShareUtils:
         if df is None or df.empty:
             return f"未找到 {code} {fyear} 的年报公告"
 
-        if fyear != "latest":
-            sub = df[
-                df["公告时间"].astype(str).str.startswith(str(fyear))
-            ]
-            if sub.empty:
-                return f"未找到 {code} {fyear} 的年报公告"
-            row = sub.iloc[0]
+        if report_year is None:
+            # latest：取披露日期最新的正式年报，优先排除摘要、英文版、更正、取消。
+            title_col = next(
+                (name for name in ("公告标题", "title", "TITLE") if name in df.columns), None
+            )
+            date_col = next(
+                (name for name in ("公告时间", "披露时间", "date") if name in df.columns), None
+            )
+            row = None
+            if title_col:
+                formal = df[df[title_col].astype(str).str.contains("年度报告", na=False)].copy()
+                if date_col and not formal.empty:
+                    formal["_date"] = pd.to_datetime(formal[date_col], errors="coerce")
+                    formal = formal.dropna(subset=["_date"])
+                if not formal.empty:
+                    clean = formal[
+                        ~formal[title_col].astype(str).str.contains(
+                            "摘要|英文版|取消|更正", regex=True, na=False
+                        )
+                    ]
+                    latest = (clean if not clean.empty else formal).sort_values("_date")
+                    row = latest.iloc[-1].drop(labels=["_date"], errors="ignore")
         else:
-            row = df.iloc[0]
+            row = _select_annual_report(df, report_year)
+        if row is None:
+            return f"未找到 {code} {fyear} 的年报公告"
 
-        return f"Link: {row['公告链接']}\nFiling Date: {row['公告时间']}"
+        return (
+            f"Report Title: {row.get('公告标题', row.get('title', ''))}\n"
+            f"Link: {row.get('公告链接', row.get('url', ''))}\n"
+            f"Filing Date: {row.get('公告时间', '')}"
+        )
 
     def get_company_news(
         symbol: Annotated[str, "6 位 A 股代码，如 600519"],

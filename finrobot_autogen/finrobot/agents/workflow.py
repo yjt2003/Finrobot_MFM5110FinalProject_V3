@@ -139,6 +139,13 @@ class SingleAssistant(SingleAssistantBase):
         **kwargs,
     ):
         super().__init__(agent_config, llm_config=llm_config)
+        # 量化相关角色只通过注册工具计算，禁止通用代码执行。
+        if self.assistant.name in {
+            "Quant_Analyst",
+            "A_Share_Factor_Researcher",
+            "A_Share_Factor_Ideator",
+        }:
+            code_execution_config = False
         self.user_proxy = UserProxyAgent(
             name="User_Proxy",
             is_termination_msg=is_termination_msg,

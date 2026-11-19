@@ -253,7 +253,7 @@ python run_agent.py --role A_Share_Analyst --model deepseek-flash
 python run_agent.py --role A_Share_Analyst --model deepseek-flash
 ```
 
-可用角色：`A_Share_Analyst`（默认，A 股）、`Market_Analyst`（市场/情绪）、`Expert_Investor`（研究报告）、`Quant_Analyst`（V2 量化实验）。上游财报、OCR/RAG 和旧实验脚本并未全部验证，不属于本次量化实验通过的范围。
+可用角色：`A_Share_Analyst`（默认，A 股基本面）、`Market_Analyst`（市场/情绪）、`Expert_Investor`（研究报告）、`A_Share_Factor_Researcher`（因子与动量回测）、`A_Share_Factor_Ideator`（因子创意与规则回测）、`Quant_Analyst`（V2 固定数据实验）。不带 `--role` 时默认进入自动分派模式，详见文末「新增功能」。上游财报、OCR/RAG 和旧实验脚本并未全部验证，不属于本次量化实验通过的范围。
 
 ---
 
@@ -268,3 +268,110 @@ python run_agent.py --role A_Share_Analyst --model deepseek-flash
   ```bash
   git update-index --no-skip-worktree finrobot_autogen/OAI_CONFIG_LIST finrobot_autogen/config_api_keys
   ```
+
+---
+
+## 5. 新增功能：自动分派、因子与规则回测（2026-11-YJT&YSQ）
+
+本节补充的是从上游 `FinRobot` 移植、并已接入 V2 现有成本与账本引擎的三项能力。三项均已用离线合成数据与 V2 原有 22 个单元测试验证，不改变 V2 固定数据实验（`Quant_Analyst`）的任何代码路径。
+
+### 5.1 自动分派模式（`--mode auto`）
+
+`run_agent.py` 现在默认不再固定单角色，而是先用正则规则（不调用 LLM）判断问题意图，再分派给一个或多个角色：
+
+```bash
+python run_agent.py                                  # 交互模式，自动分派
+python run_agent.py "综合看看 600519 的基本面和近期新闻"   # 单次提问
+python run_agent.py --mode single --role Market_Analyst  # 固定单角色（原行为）
+```
+
+- 命中单一角色时直接作答；命中多个角色时逐个作答，再由综合角色（`Research_Synthesizer`）汇总，并提示各回答之间的分歧。
+- 某一角色失败不会中断其他角色，最终回答会列出失败的角色与原因。
+- 保留最近 3 轮的角色与结论上下文，支持「那它最近成交量怎么样」这类追问。
+- `--mode auto` 不能与 `--role` 同时使用；只给 `--role` 时等同于 `--mode single`。
+
+可分派角色与关键词：
+
+| 角色 | 负责范围 | 典型关键词 |
+|---|---|---|
+| `A_Share_Analyst` | 财报、盈利质量、估值与机构预期 | 基本面、财务、估值、PE/PB、ROE |
+| `Market_Analyst` | 行情走势、新闻、公告、关注度 | 为什么涨/跌、新闻、公告、热度 |
+| `Expert_Investor` | 结构化中文研究报告与图表 | 研报、报告、PDF |
+| `A_Share_Factor_Researcher` | 现有价量因子、动量回测与买入持有/沪深 300 比较 | 因子、动量、波动率、回测 |
+| `A_Share_Factor_Ideator` | 新因子创意与受限规则 DSL 回测 | 新因子、创意、规则、策略回测 |
+| `Quant_Analyst` | 固定数据快照上的 V2 实验（人工 SMA、买入持有、结果核对） | 固定数据、量化实验、V2 实验、账本、复现实验 |
+
+### 5.2 确定性因子工具 `get_a_share_factors`
+
+`finrobot/functional/factors.py` 新增只读因子工具，按日线收盘后的可得信息计算，窗口按**实际日线条数**而非自然日：
+
+| 因子 | 公式 | 单位 |
+|---|---|---|
+| `momentum_20d` / `momentum_60d` | `Close / Close.shift(N) - 1` | 小数 |
+| `volatility_20d` | 日收益标准差 × √252 | 年化小数 |
+| `avg_volume_20d` | 最近 20 根日线成交量均值 | 手 |
+
+- 入参：六位股票代码 + `as_of`（`YYYY-MM-DD`）；自动回看 180 个自然日并取前复权日线。
+- 历史不足或字段缺失时返回 `null`，**不补零、不插值**；返回体含实际行情日期、数据来源工具与可用日线条数。
+- 成交量只是活跃度指标，不构成跨股票可比的流动性评分。
+
+### 5.3 策略规则 DSL 回测 `backtest_a_share_strategy`
+
+`finrobot/functional/momentum_backtest.py` 提供受限 JSON 规则语言，规则先校验、再转成 0/1 目标仓位，最后交给 **V2 的 `run_signal_backtest`** 执行——佣金、最低佣金、滑点、整手、仓位上限和现金账本与 V2 主实验完全一致，并附带 `audit_backtest` 的账本重建结果（`audit_ok`）。
+
+支持的指标与条件：
+
+| 指标 | 参数 |
+|---|---|
+| `momentum` | `window` |
+| `average_volume_ratio` | `short_window`、`long_window`（短均量 / 长均量） |
+| `moving_average_cross` | `field`（`close` 或 `volume`）、`short_window`、`long_window` |
+
+- 比较符：`>`、`>=`、`<`、`<=`、`==`；条件可用 `all` 或 `any` 组合。
+- 约束：窗口 1–252 根日线，单个信号最多 12 个条件，`execution` 仅支持 `next_open`。
+- 示例规则（20 日动量为正且 5 日均量高于 20 日均量）：
+
+```json
+{"name":"volume_confirmed_momentum","signal":{"all":[
+  {"indicator":"momentum","window":20,"operator":">","value":0},
+  {"indicator":"average_volume_ratio","short_window":5,"long_window":20,"operator":">","value":1}]}}
+```
+
+执行口径与输出：
+
+- 信号在该日收盘后形成，最早于下一交易日开盘成交；期末按收盘估值，不强制平仓。
+- 成本参数从 `quant_v2_config.json` 读取（通过 `load_config()`），缺失项回落到与 V2 相同的默认值；输出中会原样列出 `cost_assumptions`。
+- 同时跑同预算的买入持有作为对照，并在可取数时附沪深 300 价格指数（按相同交易日开盘价采样，不含费用）；指数取数失败时标记 `available: false`，不影响主结果。
+- 评估区间起始日之前必须有足够的预热日线，否则直接报错，不会用缺失信号交易。
+- 固定动量规则另有便捷工具 `backtest_a_share_momentum`（20 日动量为正 vs 买入持有）。
+
+可直接提问的例子：
+
+```text
+用 get_a_share_factors 看一下 600519 截至 2025-06-30 的动量和波动率
+帮我用 20 日动量大于 0 且 5 日均量高于 20 日均量的规则回测 000001，2021-06-01 到 2022-12-31
+```
+
+### 5.4 边界说明
+
+- 上述工具通过 `CNStockUtils` **实时取数**，结果不写入 `data/` 快照，也不进入 `artifacts/quant_v2` 的证据链；需要可复现证据时仍应走 `Quant_Analyst` 的固定数据快照流程。
+- `Quant_Analyst`、`A_Share_Factor_Researcher`、`A_Share_Factor_Ideator` 三个量化角色已禁用通用 Python 代码执行，只能调用注册工具（该限制集中在 `workflow.py` 的 `SingleAssistant` 中）。
+- 日线建模的简化：不模拟涨跌停、停牌、印花税、红利税与盘中成交；前复权价格已包含分红送转的价格调整；不模拟融券做空。
+- 回测结果仅为历史样本内的检验，不构成收益预测或投资建议。
+
+### 5.5 新增/修改文件
+
+| 文件 | 状态 | 说明 |
+|---|---|---|
+| `finrobot_autogen/finrobot/functional/factors.py` | 新增 | 确定性因子计算与 `get_a_share_factors` 工具 |
+| `finrobot_autogen/finrobot/functional/momentum_backtest.py` | 新增 | 策略 DSL 校验、信号构建与接入 V2 引擎的回测工具 |
+| `finrobot_autogen/finrobot/agents/research_router.py` | 新增 | 正则意图路由、多角色编排与综合汇总 |
+| `finrobot_autogen/finrobot/agents/agent_library.py` | 修改 | 新增 `A_Share_Factor_Researcher`、`A_Share_Factor_Ideator` 两个角色 |
+| `finrobot_autogen/finrobot/agents/workflow.py` | 修改 | 统一禁用三个量化角色的通用代码执行 |
+| `finrobot_autogen/run_agent.py` | 重写 | 默认自动分派，新增 `--mode auto/single` 与交互式 REPL |
+
+### 5.6 修改日志（2026-11）
+
+- 修复 `get_sec_report` 年报选择：`fyear` 现在按**报告年份**匹配，不再按公告披露年份；检索窗口覆盖到报告年后两年。
+- 同一报告期存在多条公告时，优先正式年报，排除摘要、英文版、更正和取消公告；`latest` 取最新披露的正式年报。
+- 返回值新增年报标题，涉及文件：`finrobot_autogen/finrobot/data_source/akshare_utils.py`。

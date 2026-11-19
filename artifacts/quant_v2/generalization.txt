@@ -1,5 +1,14 @@
+{"symbol": "000001", "window": "2021_2022", "ok": true, "replays": 5, "observations": 485}
+{"symbol": "000001", "window": "2023_2024", "ok": true, "replays": 5, "observations": 484}
+{"symbol": "000001", "window": "2025", "ok": true, "replays": 5, "observations": 243}
+{"symbol": "000651", "window": "2021_2022", "ok": true, "replays": 5, "observations": 485}
+{"symbol": "000651", "window": "2023_2024", "ok": true, "replays": 5, "observations": 484}
+{"symbol": "000651", "window": "2025", "ok": true, "replays": 5, "observations": 243}
+{"symbol": "600031", "window": "2021_2022", "ok": true, "replays": 5, "observations": 485}
+{"symbol": "600031", "window": "2023_2024", "ok": true, "replays": 5, "observations": 484}
+{"symbol": "600031", "window": "2025", "ok": true, "replays": 5, "observations": 243}
 {"ok": true, "cases": 9, "symbols": ["000001", "000651", "600031"], "windows": [{"name": "2021_2022", "start": "2021-01-01", "end": "2022-12-31"}, {"name": "2023_2024", "start": "2023-01-01", "end": "2024-12-31"}, {"name": "2025", "start": "2025-01-01", "end": "2025-12-31"}], "frozen_strategies": 5, "replays": 45, "passed_replays": 45, "new_llm_requests": 0, "investment_alpha_tested": false, "scope": "Finite-case functional generalization of a fixed SMA implementation, not a test of investment alpha or an LLM predictive model. Symbols and windows are fixed before fetching results.", "warmup_policy": "Past-only warm-up excluded from all metrics; first evaluation close forms the first executable signal."}
 Results: artifacts\quant_generalization\three_symbols_three_windows_7e2b4335aa5c
-Elapsed seconds: 0.372
-D:\Desktop\Finrobot_MFM5110FinalProject-main\.cache\v2_verify_env\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
+Elapsed seconds: 10.741
+D:\FinRobot_V2\Finrobot_MFM5110FinalProject_V2\.venv\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
   warnings.warn("flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.")

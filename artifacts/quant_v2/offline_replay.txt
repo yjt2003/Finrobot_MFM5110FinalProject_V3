@@ -3,6 +3,6 @@
 {"attempt": "generation_03", "ok": true}
 {"attempt": "generation_04", "ok": true}
 {"attempt": "generation_05", "ok": true}
-Elapsed seconds: 44.423
-D:\Desktop\Finrobot_MFM5110FinalProject-main\.cache\v2_verify_env\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
+Elapsed seconds: 34.751
+D:\FinRobot_V2\Finrobot_MFM5110FinalProject_V2\.venv\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
   warnings.warn("flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.")

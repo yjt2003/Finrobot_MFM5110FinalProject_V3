@@ -1,5 +1,5 @@
 [AkShareUtils] 东方财富行情获取失败（test provider fallback），回退到腾讯行情。
-D:\Desktop\Finrobot_MFM5110FinalProject-main\.cache\v2_verify_env\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
+D:\FinRobot_V2\Finrobot_MFM5110FinalProject_V2\.venv\Lib\site-packages\flaml\__init__.py:20: UserWarning: flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.
   warnings.warn("flaml.automl is not available. Please install flaml[automl] to enable AutoML functionalities.")
 test_actual_snapshot_and_legacy_entry (test_quant_v2.QuantTests.test_actual_snapshot_and_legacy_entry) ... ok
 test_bad_ohlc_rejected (test_quant_v2.QuantTests.test_bad_ohlc_rejected) ... ok
@@ -25,6 +25,6 @@ test_window_has_only_past_context (test_quant_v2.QuantTests.test_window_has_only
 test_window_rejects_insufficient_warmup (test_quant_v2.QuantTests.test_window_rejects_insufficient_warmup) ... ok
 
 ----------------------------------------------------------------------
-Ran 22 tests in 0.303s
+Ran 22 tests in 0.496s
 
 OK
